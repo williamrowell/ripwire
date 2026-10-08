@@ -474,6 +474,16 @@ add_ts_grammar(json   https://github.com/tree-sitter/tree-sitter-json.git       
 # hazard an external scanner usually implies.
 # Data only: table headers and keys become def nodes (t="sec"), NO call edges (see queries/toml/tags.scm).
 add_ts_grammar(toml   https://github.com/tree-sitter-grammars/tree-sitter-toml.git 64b56832c2cffe41758f28e05c756a3a98d16f41)  # v0.7.0
+# WDL (.wdl): Workflow Description Language — task / workflow / struct definitions, call and import edges.
+# broadinstitute/tree-sitter-wdl, not stjude-rust-labs/ — measured on 699 real files (PacBio internal repos,
+# broadinstitute/warp, theiagen, biowdl) the Broad grammar parses 90.7% clean (35/39 internal) against 55.4%
+# for stjude-rust-labs, whose grammar has no external scanner and so fails every `~{sep=" " x}` / `~{true=..}`
+# command placeholder. In the 65 files that still fail, tree recovery keeps 261/269 tasks, 18/18 workflows,
+# 52/52 calls. WDL 1.0 and 1.1; ABI 14, inside [MIN_COMPATIBLE, LANGUAGE_VERSION]=[13,15]. Ships a scanner.c
+# (command-section and string content) which the macro picks up; it is STATELESS — create() returns NULL,
+# serialize() returns 0, destroy() is empty, nothing allocates.
+# Known gap: a placeholder inside a quoted string in a command (`plt.title('~{x}')`) errors the enclosing task.
+add_ts_grammar(wdl    https://github.com/broadinstitute/tree-sitter-wdl.git e0ea84c0a38fac0122c2bf0692806250b83995fe)  # v0.1.7+, 2025-01-13
 # YAML (.yml/.yaml): config-file visibility, the third data lane (CI workflows / k8s manifests / ansible).
 # tree-sitter-grammars/, not tree-sitter/ — there is no first-party YAML grammar. v0.7.2 → ABI 14, in
 # [MIN_COMPATIBLE, LANGUAGE_VERSION]=[13,15] for core v0.26.9. Its scanner.c is STATEFUL (an indent-type/
@@ -660,6 +670,7 @@ set(RIPWIRE_TS_OBJECTS
   $<TARGET_OBJECTS:ts_elixir>
   $<TARGET_OBJECTS:ts_php>
   $<TARGET_OBJECTS:ts_toml>
+  $<TARGET_OBJECTS:ts_wdl>
   $<TARGET_OBJECTS:ts_yaml>
   $<TARGET_OBJECTS:ts_csharp>
   $<TARGET_OBJECTS:ts_c>
@@ -892,7 +903,7 @@ endif()
 set(RIPWIRE_GRAMMAR_TARGETS
   ts_cpp ts_python ts_go ts_rust ts_tsts ts_tstsx ts_swift ts_objc
   ts_javascript ts_bash ts_java ts_ruby ts_json ts_toml ts_yaml ts_csharp ts_c ts_cuda ts_markdown
-  ts_php ts_lua ts_elixir ts_dart ts_kotlin ts_gdscript)
+  ts_php ts_lua ts_elixir ts_dart ts_kotlin ts_gdscript ts_wdl)
 set(RIPWIRE_RUNTIME_COMPILE_TARGETS ripwire_probe ripwire tree-sitter ${RIPWIRE_GRAMMAR_TARGETS})
 set(RIPWIRE_RUNTIME_LINK_TARGETS ripwire_probe ripwire)
 # The C++ subset of the compile list — the only targets that include a C++ standard library at all, and so
