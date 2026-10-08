@@ -478,8 +478,10 @@ add_ts_grammar(toml   https://github.com/tree-sitter-grammars/tree-sitter-toml.g
 # broadinstitute/tree-sitter-wdl, not stjude-rust-labs/ — measured on 699 real files (PacBio internal repos,
 # broadinstitute/warp, theiagen, biowdl) the Broad grammar parses 90.7% clean (35/39 internal) against 55.4%
 # for stjude-rust-labs, whose grammar has no external scanner and so fails every `~{sep=" " x}` / `~{true=..}`
-# command placeholder. In the 65 files that still fail, tree recovery keeps 261/269 tasks, 18/18 workflows,
-# 52/52 calls. WDL 1.0 and 1.1; ABI 14, inside [MIN_COMPATIBLE, LANGUAGE_VERSION]=[13,15]. Ships a scanner.c
+# command placeholder. Tree recovery in the 65 files that still fail is PARTIAL — counting NAMED nodes only
+# (an anonymous `task`/`workflow` keyword token survives inside an ERROR node and must not be counted): 244/269
+# tasks, 8/18 workflows, 3/9 structs, 40/52 calls, 27/32 imports; an erroring task tends to swallow what follows
+# it. Those files are disclosed degraded-parse. WDL 1.0 and 1.1; ABI 14, inside [MIN_COMPATIBLE, LANGUAGE_VERSION]=[13,15]. Ships a scanner.c
 # (command-section and string content) which the macro picks up; it is STATELESS — create() returns NULL,
 # serialize() returns 0, destroy() is empty, nothing allocates.
 # Known gap: a placeholder inside a quoted string in a command (`plt.title('~{x}')`) errors the enclosing task.
