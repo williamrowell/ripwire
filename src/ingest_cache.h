@@ -302,7 +302,11 @@ constexpr std::uint32_t kCacheVersion = 28;           // 28: FE-A (test/falseedg
                                                       //    (Py `pkg.mod`, TS `./x`, Rust `crate::a::b`/`mod:x`) —
                                                       //    a target FORMAT change → old caches must be rejected.
                                                       // 4: Include gained a `bool isAngle` (quote/angle) field
-constexpr std::uint32_t kParserVer    = 152;          // bump on any grammar/.scm/extraction change
+constexpr std::uint32_t kParserVer    = 154;          // bump on any grammar/.scm/extraction change
+                                                      // 154 = 2026-10-09 (WDL structs, same lane as 150/152, PROVISIONAL): the use-site pass is armed for WDL and
+                                                      //   accepts type positions only (classifyWdlUseSite), so a `--uses` run now extracts role=Type refs
+                                                      //   for struct mentions that a 152 cache lacks. 153 is skipped on purpose (152's rich file tag is
+                                                      //   kParserVer+1 = 153). kCacheVersion stays 28.
                                                       // 152 = 2026-10-09 (WDL, same lane as 150, PROVISIONAL): extraction kept changing under 150 — imports
                                                       //   (Include + namespace Binding), then `call alias.task` captured with its receiver — so a cache a
                                                       //   150 build wrote earlier answered a later 150 build with stale facts (a cached run lost

@@ -2180,7 +2180,9 @@ inline std::string cacheRootKeyHex( const std::string& root )
 // not include this header; it relies on ingest.cpp including quality.h (line 13) before ingest_cache.h, and a reorder
 // that broke that fails the build on the undeclared name rather than passing.
 constexpr std::uint32_t kIngestCacheVersionMirror   = 28;   // MUST equal ingest.cpp's kCacheVersion (gated); 28 = FE-A ref memberCall/memberRoot, 27 = corrected fnScope values, 26 = function-local def scope span (25 = #157 + #150)
-constexpr std::uint32_t kIngestParserVerMirror    = 152;  // MUST equal ingest.cpp's kParserVer   (gated)
+constexpr std::uint32_t kIngestParserVerMirror    = 154;  // MUST equal ingest.cpp's kParserVer   (gated)
+                                                          // 154 = 2026-10-09 (WDL structs, same lane, PROVISIONAL): WDL type-mention use-sites; see
+                                                          //   ingest_cache.h's kParserVer note (153 skipped: 152's rich file tag).
                                                           // 152 = 2026-10-09 (WDL, same lane as 150, PROVISIONAL): extraction changed under 150 and a cache
                                                           //   it had written went stale; see ingest_cache.h's kParserVer note (151 skipped: 150's rich tag).
                                                           // 150 = 2026-10-08 (WDL): a new grammar, tags.scm and `.wdl` crawl row. PROVISIONAL, see

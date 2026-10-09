@@ -259,4 +259,47 @@ for sym in 'tasks.wdl:align' 'sub/util.wdl:util_task' 'tasks.wdl:sort_bam'; do
 done
 echo '  PASS cache: callers of the aliased tasks are byte-identical warm and cold'
 
+# --- struct type use-sites: --uses=STRUCT lists every place a struct is NAMED as a type ---
+# Fixture structs.wdl / structs_copy.wdl / structs_shadow.wdl. A struct is used in TYPE positions only — a typed
+# declaration (`Sample s`), inside a compound type (`Array[Sample]`, `Map[String, Cohort]`), as a struct field's
+# type, and as a struct literal's type (`Cohort { … }`). Those are `user_type` nodes and an `object`'s `type:`.
+#   structs.wdl        Sample at lines 9 10 15 16 19 24 30; Cohort at 17 32 32 (the declaration and the literal)
+#   structs_copy.wdl   a SECOND `struct Sample` (warp copies RuntimeAttr into 15 files): its one mention joins the
+#                      rows — --uses is name-matched by design, and defs= discloses the extra definitions
+#   structs_shadow.wdl a VALUE named Cohort: a read, never a type row (the guard that keys on node kind, not spelling)
+# The DEFINITION (`struct Sample {`) is not a use of itself. Type rows never enter the call graph.
+python3 - "$BIN" "$TMP/fix" <<'PYUSES'
+import re, subprocess, sys
+binp, fix = sys.argv[1], sys.argv[2]
+def uses(sym):
+    out = subprocess.run([binp, fix, '--uses=' + sym, '--no-cache', '--legend=compact'], capture_output=True, text=True).stdout
+    defs = re.search(r'<uses [^>]*defs="(\d+)"', out)
+    rows = re.findall(r'<u role="([^"]+)" p="([^"]+)" in_id="([^"]*)"/>', out)
+    return (int(defs.group(1)) if defs else -1), rows
+defs, rows = uses('Sample')
+want = sorted(['structs.wdl:9', 'structs.wdl:10', 'structs.wdl:15', 'structs.wdl:16', 'structs.wdl:19', 'structs.wdl:24', 'structs.wdl:30', 'structs_copy.wdl:11'])
+assert sorted(p for r, p, _ in rows if r == 'type') == want, ('Sample type rows', sorted(rows))
+assert all(r == 'type' for r, _, _ in rows), ('a non-type row for a struct name', rows)
+assert defs == 3, ('Sample has three definitions (tasks.wdl, structs.wdl, structs_copy.wdl): defs=', defs)
+assert not any(p in ('structs.wdl:3', 'structs_copy.wdl:5') for _, p, _ in rows), 'a struct definition counted as a use of itself'
+print('  PASS struct uses: Sample is listed at every type position, name-matched across its three definitions')
+defs, rows = uses('Cohort')
+want = sorted(['structs.wdl:17', 'structs.wdl:32', 'structs.wdl:32'])
+assert sorted(p for r, p, _ in rows) == want, ('Cohort type rows', sorted(rows))
+assert not any(p.startswith('structs_shadow.wdl') for _, p, _ in rows), 'a VALUE named Cohort produced a type row'
+print('  PASS struct uses: Cohort via a Map value type, a declaration and a struct literal; a same-named VALUE is not a use')
+out = subprocess.run([binp, fix, '--callers=Sample', '--no-cache', '--legend=compact'], capture_output=True, text=True).stdout
+assert re.search(r'<callers [^>]*count="0"', out), ('a type mention became a call edge', out[:300])
+print('  PASS struct uses: type rows stay out of the call graph (--callers=Sample count=0)')
+PYUSES
+"$BIN" "$TMP/fix" --uses=Sample --no-cache --legend=compact > "$TMP/uses1.xml"
+"$BIN" "$TMP/fix" --uses=Sample --no-cache --legend=compact > "$TMP/uses2.xml"
+cmp "$TMP/uses1.xml" "$TMP/uses2.xml"
+xmllint --noout "$TMP/uses1.xml"
+# the type rows survive the cache: the first run below populates it, the second reads it, uses1 bypassed it
+"$BIN" "$TMP/fix" --uses=Sample --legend=compact > "$TMP/usesw0.xml" 2>/dev/null
+"$BIN" "$TMP/fix" --uses=Sample --legend=compact > "$TMP/usesw1.xml" 2>/dev/null
+cmp "$TMP/usesw1.xml" "$TMP/uses1.xml" || { echo '  FAIL struct uses: --uses=Sample differs warm vs cold'; exit 1; }
+echo '  PASS struct uses: --uses output is byte-identical twice, warm equals cold, and it is well-formed'
+
 echo 'ALL PASS'

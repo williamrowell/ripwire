@@ -296,7 +296,15 @@ alias that is a URL, names no file, or names a file without that task binds noth
 (`test/wdlfix/decoy.wdl` defines a second `align` and an `only_here` to prove it). `import` itself is an `Include` fact
 (`wdlImportTarget`, `src/ingest_relations.h`) resolved by `resolveWdlImport` (`src/resolve.h`): the path relative to
 the importing document, `..` folded, one probe, no basename fallback; a URL, an absolute path or a path that names
-nothing is a visible `<inc t=…/>` row with no edge. `.wdl` is `dependencyCapable()` with its own `DepDialect::Wdl`. The grammar parses 90.7% of 699 real files cleanly (35/39 of the PacBio internal
+nothing is a visible `<inc t=…/>` row with no edge. `.wdl` is `dependencyCapable()` with its own `DepDialect::Wdl`.
+
+A struct is used in TYPE positions only, and those are what the use-site pass records for WDL (`classifyWdlUseSite`,
+`src/ingest_sidecap.h`): the `name:` of a `user_type` (`Sample s`, `Array[Sample]`, `Map[String, Cohort]`, a struct
+field's own type) and the `type:` of a struct literal (`Cohort { … }`). They are `role="type"` rows in `--uses`, name-matched
+like every non-call role (the 15 `RuntimeAttr` copies in the warp corpus share one set of rows; `defs=` discloses it), and
+they never enter the call graph. Not modeled, deliberately: value reads (`s.bam`, `~{s}` — a WDL name may be a declaration,
+an input, a call alias or a call output, and this pass cannot tell them apart), struct fields as definitions, call-output
+references (`align.bam`), and `alias X as Y` struct imports (absent from every corpus measured). The grammar parses 90.7% of 699 real files cleanly (35/39 of the PacBio internal
 repos); in the 65 that fail, tree-sitter's recovery is partial — measured on named nodes, 244/269 tasks,
 8/18 workflows, 3/9 structs — so those files are disclosed by `--skipped` as `degraded-parse` and the
 workflow after an erroring task can be lost. `test/wdlcheck.sh` asserts the disclosure, not survival.

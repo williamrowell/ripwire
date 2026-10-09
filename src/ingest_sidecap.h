@@ -953,8 +953,9 @@ struct UseCtx
 // one Type ref (`Widget`); `vector` is skipped by isNonValueContext's qualified-segment rule, the same
 // rule that already keeps a qualified VALUE read out of the index. The value-uses pass is armed for
 // C++/ObjC/Python only (see streamSideCaptures' arming), and Python spells its annotations with plain
-// `identifier`, so `user_type` (Swift) / `type_identifier` (Rust, Java, TS) are unreachable today and are
-// NOT listed — a kind in this table that no armed language can produce is a claim the gate cannot check.
+// `identifier`, so `type_identifier` (Rust, Java, TS) is unreachable today and is NOT listed — a kind in this table
+// that no armed language can produce is a claim the gate cannot check. WDL is armed too, but spells its type mentions
+// as an `identifier` under a `user_type`/`object`, which classifyWdlUseSite decides on the parent, not on this table.
 inline bool isTypeMentionNode( const char* nt ) noexcept
 {
     static const char* const kTypeMentionKinds[] = {
@@ -1062,8 +1063,36 @@ struct UseSiteShape
     TSNode access {};
 };
 
+// WDL: a struct is named ONLY in a type position, so that — and nothing else — is what the use-site pass accepts for
+// this language. The identifier is the `name:` of a `user_type` (`Sample s`, `Array[Sample]`, `Map[String, Cohort]`, a
+// struct field's own type) or the `type:` of a struct literal (`Cohort { … }`, the `object`'s one direct identifier).
+// A value read (`s.bam`, `~{s}`, a call input) is deliberately NOT indexed: a WDL name is a declaration, an input, a call
+// alias or an output, none of which this pass can tell apart, and an unmodeled zero is better than a guessed row. The
+// struct's own definition is a `struct` node's `name:` — a different parent, so a definition is never a use of itself.
+inline UseSiteShape classifyWdlUseSite( TSNode n, const char* t ) noexcept
+{
+    UseSiteShape shape;
+    if( !kindIs( t, "identifier" ) )
+    {
+        return shape;
+    }
+    const TSNode parent = ts_node_parent( n );
+    if( ts_node_is_null( parent ) )
+    {
+        return shape;
+    }
+    const char* pt = ts_node_type( parent );
+    shape.typeMention = kindIs( pt, "user_type" ) || kindIs( pt, "object" );
+    shape.accept      = shape.typeMention;
+    return shape;
+}
+
 inline UseSiteShape classifyUseSite( TSNode n, const char* t, Lang lang ) noexcept
 {
+    if( lang == Lang::Wdl )
+    {
+        return classifyWdlUseSite( n, t );
+    }
     UseSiteShape shape;
     shape.typeMention = isTypeMentionNode( t );
     const bool isFieldIdent = kindIs( t, "field_identifier" );
@@ -1582,7 +1611,8 @@ void captureSideFacts( const LangEntry& le, std::uint32_t fileId, std::string_vi
         bindCtx.cFamilyFn = ( le.lang == Lang::Cpp || le.lang == Lang::C || le.lang == Lang::ObjC );
 
         // ABS-3: read/write use-site capture (bare value identifiers + assignment targets). C++/ObjC/Python —
-        // the languages whose assignment/update grammar shapes isWriteTarget knows. role=Read/Write refs NEVER
+        // the languages whose assignment/update grammar shapes isWriteTarget knows — plus WDL, whose pass accepts
+        // struct TYPE mentions only (classifyWdlUseSite). role=Read/Write refs NEVER
         // enter the call graph (buildGraph skips role != Call), so PageRank and the default map are unchanged.
         UseCtx useCtx { fileId, le.lang, src, &refs };
 
@@ -1608,7 +1638,7 @@ void captureSideFacts( const LangEntry& le, std::uint32_t fileId, std::string_vi
         {
             arms.bind = &bindCtx;
         }
-        if( captureValueUses && ( le.lang == Lang::Cpp || le.lang == Lang::ObjC || le.lang == Lang::Python ) )
+        if( captureValueUses && ( le.lang == Lang::Cpp || le.lang == Lang::ObjC || le.lang == Lang::Python || le.lang == Lang::Wdl ) )
         {
             arms.uses = &useCtx;
         }
