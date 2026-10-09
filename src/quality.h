@@ -1216,7 +1216,7 @@ inline std::vector<NodeId> pythonDispatchedMethodIds( const IngestResult& ing, c
 inline bool langUsesHashComment( Lang l ) noexcept
 {
     return l == Lang::Python || l == Lang::Bash || l == Lang::Ruby || l == Lang::Elixir
-        || l == Lang::Toml   || l == Lang::Yaml || l == Lang::GDScript;
+        || l == Lang::Toml   || l == Lang::Yaml || l == Lang::GDScript || l == Lang::Wdl;
 }
 
 inline std::uint32_t codeLinesInBody( std::string_view body, Lang lang ) noexcept
@@ -2180,7 +2180,9 @@ inline std::string cacheRootKeyHex( const std::string& root )
 // not include this header; it relies on ingest.cpp including quality.h (line 13) before ingest_cache.h, and a reorder
 // that broke that fails the build on the undeclared name rather than passing.
 constexpr std::uint32_t kIngestCacheVersionMirror   = 28;   // MUST equal ingest.cpp's kCacheVersion (gated); 28 = FE-A ref memberCall/memberRoot, 27 = corrected fnScope values, 26 = function-local def scope span (25 = #157 + #150)
-constexpr std::uint32_t kIngestParserVerMirror    = 148;  // MUST equal ingest.cpp's kParserVer   (gated)
+constexpr std::uint32_t kIngestParserVerMirror    = 150;  // MUST equal ingest.cpp's kParserVer   (gated)
+                                                          // 150 = 2026-10-08 (WDL): a new grammar, tags.scm and `.wdl` crawl row. PROVISIONAL, see
+                                                          //   ingest_cache.h's kParserVer note (149 skipped: 148's rich file tag is 149).
                                                           // 148 = 2026-10-04 (train 26a: PR #373 merged; above the branch's 145 and the 145–147
                                                           //   lanes in flight, see kParserVer note; kIngestCacheVersionMirror stays main's 28)
                                                           // 141 = 2026-10-04 (train 25: above FE-A's 134/135 and refval-edges' 140, see kParserVer

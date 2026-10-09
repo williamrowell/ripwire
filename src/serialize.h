@@ -622,6 +622,12 @@ inline constexpr TokenCalib kTokenCalib[] =
                                    // that put Ruby at the dense end of the band, so Lua borrows Ruby's exact
                                    // 2.40 rather than guessing. Recalibrate with Ruby. Same headroom clamp:
                                    // `s.lang==Lua` (19) never reaches contentBytesByLang[13].
+    { Lang::Wdl,        2.36 },   // REASONED, not measured — WDL symbols are snake_case task/workflow names
+                                   // (samtools_sort, hiphase) over a small keyword set, Python's identifier shape,
+                                   // so it borrows Python's MEASURED 2.36 rather than guessing. The dense end of
+                                   // the band, which can only shrink a budget, never overrun it. Recalibrate with
+                                   // Python when tokenbudgetcheck gets a .wdl corpus. Same headroom clamp:
+                                   // `s.lang==Wdl` (24) never reaches contentBytesByLang[13].
 };
 inline constexpr double kBytesPerTokenDefault = 2.50;   // Unknown-language / empty-map fallback (mid-band)
 

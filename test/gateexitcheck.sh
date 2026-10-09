@@ -297,6 +297,7 @@ FAILFAST = {
     "astrocheck.sh":           ( "set -e and Python assertions; same shape as elixircheck. rc READ, not inferred: run against the stock 0.6.2 binary (which has no .astro row in kLangTable, so every fixture file is unindexed and arm 1 asserts first) it exits 1", 1 ),
     "dartcheck.sh":            ( "set -e and Python assertions; pre-Dart HEAD binary probed to exit 1", 1 ),
     "elixircheck.sh":          ( "set -e and Python assertions; pre-Elixir HEAD binary probed to exit 1", 1 ),
+    "wdlcheck.sh":             ( "set -e and Python assertions; same shape as gdscriptcheck. rc READ, not inferred: run against a binary built from main without the WDL change (which indexes no .wdl, so the fixture yields zero symbols) it exits 1", 1 ),
     "gdscriptcheck.sh":        ( "set -e and Python assertions; same shape as elixircheck. rc READ, not inferred: run against the pre-GDScript baseline binary (which indexes no .gd, so the fixture yields zero symbols) it exits 1", 1 ),
     "agentloopcodexcheck.sh":  ( "trailing Python assertions make the interpreter rc the gate rc",     1 ),
     "clonebandcheck.sh":        ( "every check is `echo FAIL; exit 2` at the site",                      2 ),

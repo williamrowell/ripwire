@@ -291,6 +291,7 @@ set(_ripwire_query_names
   toml
   tsx
   typescript
+  wdl
   yaml)
 set(_ripwire_generated_dir "${CMAKE_CURRENT_BINARY_DIR}/generated")
 set(_ripwire_embedded_queries "${_ripwire_generated_dir}/embedded_queries.h")
@@ -1385,6 +1386,7 @@ if(RIPWIRE_FUZZ)
   add_ripwire_fuzzer(lua        tree_sitter_lua        lua)
   add_ripwire_fuzzer(kotlin     tree_sitter_kotlin     kotlin)
   add_ripwire_fuzzer(gdscript   tree_sitter_gdscript   gdscript)
+  add_ripwire_fuzzer(wdl        tree_sitter_wdl        wdl)
   add_custom_target(ripwire_fuzzers DEPENDS ${RIPWIRE_FUZZ_TARGETS})
 
   # ---- reader fuzzers: ripwire's OWN parsers of bytes it did not create (test/fuzz/readers/) ----

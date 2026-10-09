@@ -302,7 +302,12 @@ constexpr std::uint32_t kCacheVersion = 28;           // 28: FE-A (test/falseedg
                                                       //    (Py `pkg.mod`, TS `./x`, Rust `crate::a::b`/`mod:x`) —
                                                       //    a target FORMAT change → old caches must be rejected.
                                                       // 4: Include gained a `bool isAngle` (quote/angle) field
-constexpr std::uint32_t kParserVer    = 148;          // bump on any grammar/.scm/extraction change
+constexpr std::uint32_t kParserVer    = 150;          // bump on any grammar/.scm/extraction change
+                                                      // 150 = 2026-10-08 (WDL, test/wdlcheck.sh): a new grammar (third_party/deps/wdl) and
+                                                      //   queries/wdl/tags.scm, `.wdl` a kLangTable row, Lang::Wdl appended (24): a tree with
+                                                      //   `.wdl` files yields new files, symbols and edges. PROVISIONAL — the maintainers assign
+                                                      //   the final number. 149 is skipped on purpose: 148's rich file tag is kParserVer+1 = 149,
+                                                      //   so a build at 149 would read 148's rich tag as its own plain one. kCacheVersion stays 28.
                                                       // 148 = 2026-10-04 (train 26a: PR #373, Ruby method lookup, merged onto main's 143):
                                                       //   cache-key hygiene. The branch's Ruby extraction steps ran as 130–137,
                                                       //   142 and 145 (its notes below); main used 130–143 for other lanes, and

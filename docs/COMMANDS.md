@@ -17,7 +17,7 @@ current shape.
 > stream a deterministic minified XML map to stdout. Zero runtime deps. Languages: C++, C, ObjC/ObjC++,
 > Metal (MSL, .metal — C++ grammar), CUDA (.cu/.cuh — tree-sitter-cuda, <<<>>> launches are call edges),
 > Python, TypeScript (.ts/.tsx/.mts/.cts; .astro frontmatter), JavaScript, Java, Ruby, PHP (.php/.phtml), Lua, Elixir (.ex/.exs), Dart (.dart), Kotlin (.kt), Bash, Go, Rust, Swift, C#,
-> GDScript (.gd — Godot; .tscn/.tres/.gdshader are NOT indexed);
+> GDScript (.gd — Godot; .tscn/.tres/.gdshader are NOT indexed); WDL (.wdl — tasks, workflows, structs, unqualified calls);
 > JSON, TOML, YAML (config keys); Markdown (.md/.markdown — headings are section symbols with spans).
 
 ## How to read a section

@@ -281,6 +281,23 @@ its base are unrelated in the graph and `--uses` on the base reports no `role="e
 GDScript extraction landed at revision 98 — `kParserVer` in `src/ingest_cache.h`, mirrored by
 `kIngestParserVerMirror` in `src/quality.h`; snapshot scheme is unchanged.
 
+<a id="wdl-extraction"></a>
+
+WDL needs no capture-filter module: `queries/wdl/tags.scm` alone is the extraction. `task` and `workflow`
+are both `@definition.function` (WDL has no method or class), `struct` is `@definition.struct`, and an
+UNQUALIFIED `call` — the target is a `qualified_identifier` with exactly one identifier child — is the one
+call edge. An import-qualified `call t.align` names a task in another document through an alias bound by
+`import "tasks.wdl" as t`; no WDL import resolver exists, and sending the bare `align` to the global name
+ladder would mint edges that are not real, so it is counted as unresolved and is not an edge
+(`test/wdlfix/decoy.wdl` defines a second `align` to prove it). `import` is not captured and `.wdl` is not
+`dependencyCapable()`. The grammar parses 90.7% of 699 real files cleanly (35/39 of the PacBio internal
+repos); in the 65 that fail, tree-sitter's recovery is partial — measured on named nodes, 244/269 tasks,
+8/18 workflows, 3/9 structs — so those files are disclosed by `--skipped` as `degraded-parse` and the
+workflow after an erroring task can be lost. `test/wdlcheck.sh` asserts the disclosure, not survival.
+
+WDL extraction landed at revision 150 (provisional) — `kParserVer` in `src/ingest_cache.h`, mirrored by
+`kIngestParserVerMirror` in `src/quality.h`; snapshot scheme is unchanged.
+
 <a id="astro-extraction"></a>
 
 Astro is the first extension whose parse is restricted to a SUB-RANGE of the file. An `.astro` file is a

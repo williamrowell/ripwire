@@ -136,7 +136,7 @@ claim cannot quietly drift. The row-by-row ledger is
 </details>
 
 **Languages:** Rust · C++ · Objective-C/C++ · C · Metal · CUDA · Python · Go · Swift · TypeScript ·
-JavaScript · Java · Ruby · PHP · Lua · Elixir · Dart · Kotlin · GDScript · Bash · C# · JSON · TOML · YAML · Markdown — see
+JavaScript · Java · Ruby · PHP · Lua · Elixir · Dart · Kotlin · GDScript · WDL · Bash · C# · JSON · TOML · YAML · Markdown — see
 [language support and limits](#languages).
 
 **Latest: 0.6.5** — TypeScript alias imports resolve, and fixes from Windows testers. [Release notes](#release-notes) ·
@@ -2082,9 +2082,9 @@ wrong, and it has. These are the results that say so, all in-tree, all published
 ### In the tests
 
 <details>
-<summary><b>671 gate scripts</b>, five contracts no unit test can hold, and the house rule: write the gate before the code it measures</summary> <!-- gatecount -->
+<summary><b>672 gate scripts</b>, five contracts no unit test can hold, and the house rule: write the gate before the code it measures</summary> <!-- gatecount -->
 
-`test/regression.sh` names **671 gate scripts** and is the authoritative list; <!-- gatecount -->
+`test/regression.sh` names **672 gate scripts** and is the authoritative list; <!-- gatecount -->
 `python3 test/pargates.py . ./build/ripwire -j 6` runs the same set in parallel. On top of them sit the
 contracts that do not fit a unit test: two runs byte-identical, warm output identical to cold, output
 that pipes clean through `xmllint --noout`, a sanitizer build with `-fno-sanitize-recover=all`, and a
@@ -2948,6 +2948,7 @@ file, and one row in the extension table.
 | Bash | `.sh`, `.bash` | |
 | Astro | `.astro` | **Frontmatter only.** The `---`-fenced block is parsed as TypeScript, through one `ts_parser_set_included_ranges` call; the template half — including `<script>` bodies and `{…}` interpolations — is NOT indexed, so a call made only from the template produces no edge. An `.astro` file reports `lang="ts"` because it rides `Lang::TypeScript` (that is what lets a frontmatter call resolve into a `.ts` service). A top-level frontmatter call is module-scope code, so `--callers` names `<file-scope>` rather than a function. No Astro grammar is vendored. |
 | GDScript | `.gd` | A file is a class body: `class_name` names it and file-scope `func`/`var` are its members. A signal is indexed as a member. `preload`/`load` produce no dependency edge. `.tscn`, `.tres`, and `.gdshader` are not indexed. |
+| WDL | `.wdl` | `task` and `workflow` are functions, `struct` is a struct. An unqualified `call` (same document) is a call edge; an import-qualified `call t.align` is NOT, and `import` produces no dependency edge. The grammar (`broadinstitute/tree-sitter-wdl`, WDL 1.0/1.1) parses about 90% of real files cleanly; a file it cannot parse is listed by `--skipped` as degraded-parse, and an erroring task can take the definitions after it. A placeholder inside a quoted string in a command (`'~{x}\n…'`) is the known trigger. |
 | JSON | `.json` | Config keys become symbols. The lane emits no call edges. |
 | TOML | `.toml` | A table header is one symbol. Keys below it are one level down. |
 | YAML | `.yml`, `.yaml` | Mapping depth 2 is the cut. Sequence levels are transparent. |

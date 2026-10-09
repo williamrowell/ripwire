@@ -68,7 +68,7 @@ inline constexpr std::string_view kJbuilderExt = ".jbuilder";
 // Order does not matter (linear scan); kept grouped by language for readability.
 // The extent is EXACT, not headroom: it was 32 with 32 rows, .toml made it 33, .pyi made it 34 and the
 // .yml/.yaml pair made it 36, the .php/.phtml/.lua trio made it 40, the .ex/.exs pair made it 42, the
-// .rst/.adoc/.org/.mdx prose quartet made it 46, .dart made it 47, .kt made it 48, .hxx made it 49 and .gd made it 50. Sizing it to the row count is what
+// .rst/.adoc/.org/.mdx prose quartet made it 46, .dart made it 47, .kt made it 48, .hxx made it 49, .gd made it 50 and .wdl made it 54 (the count above had drifted). Sizing it to the row count is what
 // makes
 // `std::array<bool, kLangTable.size()> present` (the grammar-prewarm set,
 // below) exact too, and it turns "added a row and forgot the extent" into a compile error rather than a
@@ -97,7 +97,7 @@ inline constexpr std::string_view kJbuilderExt = ".jbuilder";
 // the latter a list item), so those files carry the file-level node alone and serve as ONE whole-file
 // unit. A heading detector per format is a later lane with its own measurement. `.mdx` is markdown with
 // JSX, which the block grammar already reads as html blocks (opaque). Gate: test/textdocscheck.sh.
-constexpr std::array<LangEntry, 53> kLangTable = {{
+constexpr std::array<LangEntry, 54> kLangTable = {{
     { ".cpp",  Lang::Cpp,        &tree_sitter_cpp,        "cpp"        },
     { ".cc",   Lang::Cpp,        &tree_sitter_cpp,        "cpp"        },
     { ".cxx",  Lang::Cpp,        &tree_sitter_cpp,        "cpp"        },
@@ -216,6 +216,10 @@ constexpr std::array<LangEntry, 53> kLangTable = {{
     // function/var rather than needing an enclosing class node. `.tscn`/`.tres`/`.gdshader` are NOT
     // indexed: they are scene/resource/shader formats with their own grammars, and none is vendored here.
     { ".gd",   Lang::GDScript,   &tree_sitter_gdscript,   "gdscript"   },   // GDScript — class/func/var/const/enum/signal defs + calls
+    // WDL (.wdl): Workflow Description Language. `task`, `workflow` and `struct` are the definitions; `call` is the
+    // edge. An import-qualified call (`call t.align`) names a task in ANOTHER document and has no resolver yet, so
+    // queries/wdl/tags.scm captures only the unqualified spelling. Grammar blind spots: test/wdlcheck.sh.
+    { ".wdl",  Lang::Wdl,        &tree_sitter_wdl,        "wdl"        },   // WDL — task/workflow/struct defs + unqualified calls
     // Kotlin: `.kts` (Gradle script DSL) is deliberately NOT a row here yet — its trailing-lambda
     // density needs its own parse-quality probe before riding this grammar; `.kt` only for now.
     { ".kt",   Lang::Kotlin,     &tree_sitter_kotlin,     "kotlin"     },   // Kotlin — classes/objects/interfaces/functions + calls; JVM-bridged to Java (graph.h langCompatible)
