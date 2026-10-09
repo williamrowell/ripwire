@@ -4,11 +4,15 @@ version 1.0
 task shadow {
   input {
     String Cohort
+    Int n
   }
+  Int doubled = n * 2
+  Array[Int] range = [n, doubled]
   command <<<
-    echo ~{Cohort}
+    echo ~{Cohort} ~{doubled}
   >>>
   output {
     String o = Cohort
+    Int total = n + doubled
   }
 }
