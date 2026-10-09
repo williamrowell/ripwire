@@ -48,12 +48,8 @@ print('  PASS decoy: a duplicated task name keeps one def per file')
 # --- call edges ---
 # `call local_helper` names a task in the SAME file: a real edge.
 assert 'local_helper' in calls('main.wdl', 'main'), calls('main.wdl', 'main')
-# `call t.align` / `call t.sort_bam` are QUALIFIED by an import alias. No WDL resolver exists yet, and a
-# qualified call must never fall onto the global name ladder (decoy.wdl also defines `align`): it is
-# counted as unresolved, not as an edge.
-assert 'align' not in calls('main.wdl', 'main'), 'qualified call t.align minted an edge (decoy risk)'
-assert 'sort_bam' not in calls('main.wdl', 'main'), 'qualified call t.sort_bam minted an edge'
-print('  PASS unqualified call edge, and no edge for an import-qualified call')
+# `call t.align` / `call t.sort_bam` are QUALIFIED by an import alias; where they bind is the arm below.
+print('  PASS unqualified call edge')
 
 # --- DISCLOSED blind spot: a literal \n after a placeholder inside a quoted string in a command ---
 b = byfile['blindspots.wdl']
@@ -200,11 +196,11 @@ printf '%s' "$DEPS" | grep -q '<f p="main.wdl" includes="4"' \
     || { echo "  FAIL capture: main.wdl should carry exactly 4 import directives: $( printf '%s' "$DEPS" | grep -oE '<f p="main.wdl"[^>]*>' )"; exit 1; }
 echo '  PASS capture: main.wdl carries exactly 4 import directives'
 # tasks.wdl is imported by main.wdl AND by sub/util.wdl (via `..`); sub/util.wdl once.
-printf '%s' "$DEPS" | grep -q '<f p="tasks.wdl" afferent="2"/>' \
-    || { echo "  FAIL resolve: tasks.wdl afferent != 2: $( printf '%s' "$DEPS" | grep -oE '<f p="tasks.wdl"[^>]*>' )"; exit 1; }
-printf '%s' "$DEPS" | grep -q '<f p="sub/util.wdl" afferent="1"/>' \
-    || { echo "  FAIL resolve: sub/util.wdl afferent != 1"; exit 1; }
-echo '  PASS resolve: tasks.wdl afferent=2 (sibling + `..` from a subdirectory), sub/util.wdl afferent=1'
+printf '%s' "$DEPS" | grep -q '<f p="tasks.wdl" afferent="3"/>' \
+    || { echo "  FAIL resolve: tasks.wdl afferent != 3: $( printf '%s' "$DEPS" | grep -oE '<f p="tasks.wdl"[^>]*>' )"; exit 1; }
+printf '%s' "$DEPS" | grep -q '<f p="sub/util.wdl" afferent="2"/>' \
+    || { echo "  FAIL resolve: sub/util.wdl afferent != 2"; exit 1; }
+echo '  PASS resolve: tasks.wdl afferent=3 (two siblings + `..` from a subdirectory), sub/util.wdl afferent=2'
 # mutation controls: a remote URL and a missing path are DISCLOSED rows with no edge; decoy.wdl is never
 # the target of anything (no basename or stem fallback); blindspots.wdl imports nothing.
 if printf '%s' "$DEPS" | grep -qE '<f p="(decoy|blindspots)\.wdl" afferent='; then
@@ -217,5 +213,50 @@ printf '%s' "$DEPS" | grep -qE 'dep_langs="[^"]*,wdl[,"]' \
 printf '%s' "$DEPS" | grep -qE '<health files="([0-9]+)" dep_files="\1"' \
     || { echo "  FAIL capability: dep_files != files: $( printf '%s' "$DEPS" | grep -oE '<health [^/]*/>' )"; exit 1; }
 echo '  PASS capability: wdl is in dep_langs= and every .wdl file is dependency-capable'
+
+# --- qualified calls: `call alias.task` binds through the import alias, never the global name ladder ---
+# Fixture qualified.wdl (and main.wdl's own `call t.align` / `call t.sort_bam as sorter`). `align` is defined in
+# tasks.wdl AND decoy.wdl, so a bare-name resolution would be ambiguous or wrong; the alias names ONE file.
+#   call t.align            -> tasks.wdl::align        the alias `t` is tasks.wdl; decoy.wdl::align must not be reached
+#   call util.util_task     -> sub/util.wdl::util_task `import "sub/util.wdl"` with no `as` binds the file STEM, `util`
+#   call t.only_here        -> NO edge                 tasks.wdl has no only_here; decoy.wdl does, and must not catch it
+#   call remote.align       -> NO edge                 the alias is a URL: outside the crawl
+#   call ghost.align        -> NO edge                 the alias names a path that names nothing
+callers() {
+    "$BIN" "$TMP/fix" --callers="$1" --no-cache --legend=compact 2>/dev/null \
+        | python3 -c "
+import sys, re
+t = sys.stdin.read()
+m = re.search(r'<callers [^>]*count=\"(\d+)\"', t)
+names = sorted(set(re.findall(r'<s [^>]*n=\"([^\"]+)\"', t)))
+print(m.group(1) if m else 'NONE', ','.join(names))"
+}
+check_callers() {   # check_callers <file:name> <expected count> <expected comma-joined caller names> <message>
+    got="$( callers "$1" )"
+    if [ "$got" != "$2 $3" ]; then
+        echo "  FAIL qualified: callers of $1 = [$got], want [$2 $3] — $4"; exit 1
+    fi
+    echo "  PASS qualified: $4"
+}
+check_callers 'tasks.wdl:align'        2 'main,qualified' 'call t.align binds tasks.wdl::align (callers main and qualified; qualified calls it twice, counted once)'
+check_callers 'decoy.wdl:align'        0 ''               'the same-named decoy.wdl::align is never reached'
+check_callers 'sub/util.wdl:util_task' 1 'qualified'      'the default namespace (file stem) binds: call util.util_task'
+check_callers 'decoy.wdl:only_here'    0 ''               'call t.only_here does not fall through to decoy.wdl (the alias names a file without it)'
+check_callers 'tasks.wdl:sort_bam'     1 'main'           'call t.sort_bam as sorter binds through the alias'
+
+# --- the qualified-call edges survive the cache: a WARM run answers exactly as a COLD one ---
+# REGRESSION ARM. The alias binding rides facts the cache stores (an Import Binding and a call's receiver). A
+# warm run serving facts written by an OLDER extraction (same kParserVer, different extraction) lost main.wdl's two
+# qualified edges while a cold run kept them — found by test/mcpclidiffcheck.sh (CLI 35187 edges, cold 35189). The
+# first run below populates the cache, the second reads it, the third bypasses it.
+for sym in 'tasks.wdl:align' 'sub/util.wdl:util_task' 'tasks.wdl:sort_bam'; do
+    "$BIN" "$TMP/fix" --callers="$sym" --legend=compact > "$TMP/warm0.xml" 2>/dev/null
+    "$BIN" "$TMP/fix" --callers="$sym" --legend=compact > "$TMP/warm1.xml" 2>/dev/null
+    "$BIN" "$TMP/fix" --callers="$sym" --legend=compact --no-cache > "$TMP/cold.xml" 2>/dev/null
+    if ! cmp -s "$TMP/warm1.xml" "$TMP/cold.xml"; then
+        echo "  FAIL cache: callers of $sym differ warm vs cold"; diff "$TMP/warm1.xml" "$TMP/cold.xml" | head -4; exit 1
+    fi
+done
+echo '  PASS cache: callers of the aliased tasks are byte-identical warm and cold'
 
 echo 'ALL PASS'

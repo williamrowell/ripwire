@@ -1285,6 +1285,42 @@ inline std::string wdlImportTarget( TSNode n, std::string_view src )
     return kindIs( ts_node_type( only ), "content" ) ? std::string( nodeTextOf( only, src ) ) : std::string{};
 }
 
+// The NAMESPACE a WDL import binds, as a file-scope Import RawBind (var = the namespace, typeName = the specifier as
+// written, importedName = "module" — the marker graph.h's alias rule trusts to mean "this name IS that file"). `as t`
+// names it; with no `as` the spec derives it from the file name — its last path segment without the `.wdl`
+// extension (`import "sub/util.wdl"` binds `util`). Nothing is bound when the specifier is not a single literal.
+inline void captureWdlImportBind( TSNode n, const std::string& target, std::uint32_t fileId, std::string_view src, std::vector<RawBind>& binds )
+{
+    std::string ns;
+    if( const TSNode id = firstChildOfType( n, "identifier" ); !ts_node_is_null( id ) )
+    {
+        ns.assign( nodeTextOf( id, src ) );   // the direct `identifier` child is the `as` namespace
+    }
+    else
+    {
+        std::string_view stem = target;
+        stem.remove_prefix( stem.rfind( '/' ) == std::string_view::npos ? 0 : stem.rfind( '/' ) + 1 );
+        if( stem.ends_with( ".wdl" ) )
+        {
+            stem.remove_suffix( 4 );
+        }
+        ns.assign( stem );
+    }
+    if( ns.empty() || target.empty() )
+    {
+        return;
+    }
+    RawBind b;
+    b.fileId       = fileId;
+    b.startByte    = ts_node_start_byte( n );
+    b.lang         = Lang::Wdl;
+    b.kind         = LocalBindKind::Import;
+    b.var          = std::move( ns );
+    b.typeName     = target;
+    b.importedName = "module";
+    binds.push_back( std::move( b ) );
+}
+
 // Lua `require "a.b"` / `require("a.b")` — a `function_call` whose `name:` is the bare identifier
 // `require`. The dotted specifier is package.path's convention, resolved in resolve.h::resolveLuaRequire
 // (`a.b` → `a/b.lua`). `name:` must be an `identifier`, never a `dot_index_expression`: `pkg.require("x")`
@@ -2556,6 +2592,10 @@ void captureIncludes( TSNode root, Lang lang, std::uint32_t fileId, std::string_
         if( lang == Lang::Python && !target.empty() )
         {
             capturePythonImportBinds( n, t, fileId, src, binds );   // Phase 5: the bound NAMES, beside the module
+        }
+        else if( lang == Lang::Wdl && !target.empty() )
+        {
+            captureWdlImportBind( n, target, fileId, src, binds );  // the namespace the import binds, beside the file
         }
         // One directive's emission — the Include record plus its ABS-3 import-role use-site ref. A LAMBDA
         // rather than the straight-line block it used to be for exactly one reason: an Elixir

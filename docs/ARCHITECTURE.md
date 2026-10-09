@@ -286,10 +286,14 @@ GDScript extraction landed at revision 98 — `kParserVer` in `src/ingest_cache.
 WDL needs no capture-filter module: `queries/wdl/tags.scm` alone is the extraction. `task` and `workflow`
 are both `@definition.function` (WDL has no method or class), `struct` is `@definition.struct`, and an
 UNQUALIFIED `call` — the target is a `qualified_identifier` with exactly one identifier child — is the one
-call edge. An import-qualified `call t.align` names a task in another document through an alias bound by
-`import "tasks.wdl" as t`; no WDL call resolver exists yet, and sending the bare `align` to the global name
-ladder would mint edges that are not real, so it is counted as unresolved and is not an edge
-(`test/wdlfix/decoy.wdl` defines a second `align` to prove it). `import` itself is an `Include` fact
+call edge. An import-qualified `call t.align` names a task in another document through the namespace
+`import "tasks.wdl" as t` binds (with no `as`, the file stem). It is captured as a call whose receiver is the
+namespace (`wdlCallReceiver`, `src/ingest_binds.h`; the namespace itself is an `Import` binding,
+`captureWdlImportBind`), and `src/graph.h` binds it through Python's Rule 2d: the alias's ONE file, and that file's
+definition of the task. Unlike Python, a miss does not fall to the bare-name ladder — a WDL qualifier names one other
+document, so a same-named task anywhere else is wrong by construction — and the call is counted as unresolved: an
+alias that is a URL, names no file, or names a file without that task binds nothing
+(`test/wdlfix/decoy.wdl` defines a second `align` and an `only_here` to prove it). `import` itself is an `Include` fact
 (`wdlImportTarget`, `src/ingest_relations.h`) resolved by `resolveWdlImport` (`src/resolve.h`): the path relative to
 the importing document, `..` folded, one probe, no basename fallback; a URL, an absolute path or a path that names
 nothing is a visible `<inc t=…/>` row with no edge. `.wdl` is `dependencyCapable()` with its own `DepDialect::Wdl`. The grammar parses 90.7% of 699 real files cleanly (35/39 of the PacBio internal

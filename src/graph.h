@@ -1786,6 +1786,25 @@ inline std::vector<std::vector<std::uint32_t>> buildPythonImportFiles( const Ing
     return files;
 }
 
+// WDL: the file a `call alias.task` namespace names, keyed "<fileId>#alias" into the SAME importBindFile table Python's
+// Rule 2d reads. A WDL namespace is bound by `import "x.wdl" as alias` (or, with no `as`, the file stem) and names ONE
+// document by a path relative to the importer (resolve.h resolveWdlImport), so the whole of the Python machinery around
+// it — the external-name verdict ladder, the module-suffix fallback, the module-rebind veto — has nothing to say here and
+// is not run. A namespace that resolves to no indexed file (a URL, a missing path) is recorded as kNoFile on purpose: it
+// is still the name's binding, and Rule 2d refuses a kNoFile entry exactly as it refuses an absent one. A namespace bound
+// twice to DIFFERENT files in one document (a WDL error) poisons to kNoFile rather than guessing.
+inline void recordWdlNamespaceFile( const Binding& b, std::string_view includerPath, const HashMap<std::string, std::uint32_t>& fileIndex,
+                                    std::string& key, HashMap<std::string, std::uint32_t>& importBindFile )
+{
+    const std::uint32_t moduleFile = resolvePreciseInclude( includerPath, b.typeName, /*isAngle=*/ false, fileIndex );
+    key.clear();  Narrower::appendUint( key, b.fileId );  key.push_back( '#' );  key.append( b.var );
+    const auto [ it, inserted ] = importBindFile.try_emplace( key, moduleFile );
+    if( !inserted && it->second != moduleFile )
+    {
+        it->second = kNoFile;
+    }
+}
+
 inline PythonImportVetoes buildPythonImportVetoes( const IngestResult& ing, const HashMap<std::string, std::uint32_t>& fileIndex,
                                                     const HashMap<std::string, char>& moduleNames,
                                                     const HashMap<std::string, char>& pythonModuleRebind )
@@ -1798,6 +1817,11 @@ inline PythonImportVetoes buildPythonImportVetoes( const IngestResult& ing, cons
     {
         if( b.kind != LocalBindKind::Import || b.var.empty() || b.typeName.empty() || b.fileId >= ing.files.size() )
         {
+            continue;
+        }
+        if( rootRelPath( ing, b.fileId ).ends_with( ".wdl" ) )   // Binding carries no Lang: the file's own extension says it
+        {
+            recordWdlNamespaceFile( b, rootRelPath( ing, b.fileId ), fileIndex, key, t.importBindFile );
             continue;
         }
         // the module fileId Step-A pins, computed unconditionally (even for a relative spec, where
@@ -6227,7 +6251,7 @@ inline Graph buildGraph( const IngestResult& ing, const ScipOverlay* scip = null
         // gate above already reuses) rather than a THIRD `ExternalVeto` accessor beside hasLocal/importVerdict
         // — that shape read as a clone of both (--quality-delta), being the same two lines a third time.
         if( !scipPinned && !canonical && !narrowed && it != byName.end()
-            && r.lang == Lang::Python && r.recv == RecvKind::NamedVar && !r.recvVar.empty()
+            && ( r.lang == Lang::Python || r.lang == Lang::Wdl ) && r.recv == RecvKind::NamedVar && !r.recvVar.empty()
             && !externalVeto.hasLocal( r, r.recvVar ) )
         {
             bindKey.clear();  Narrower::appendUint( bindKey, r.fileId );  bindKey.push_back( '#' );  bindKey.append( r.recvVar );
@@ -6254,6 +6278,17 @@ inline Graph buildGraph( const IngestResult& ing, const ScipOverlay* scip = null
                     narrowed = true;
                 }
             }
+        }
+        // WDL: `call alias.task` binds through its alias (Rule 2d above) or NOT AT ALL. Unlike Python — where a miss on the alias
+        // falls to the bare-name ladder, which can only pick among names the module-level lookup also reaches — a WDL qualifier
+        // names ONE other document, so every candidate that document does not define is wrong by construction: the ladder would
+        // bind `t.only_here` to an unrelated `only_here` in a file `t` never imported. Counted as unresolved, never an edge
+        // (test/wdlcheck.sh: t.only_here, remote.align, ghost.align).
+        if( !scipPinned && !canonical && !narrowed && r.lang == Lang::Wdl && r.recv == RecvKind::NamedVar && !r.recvVar.empty() )
+        {
+            ++g.unresolvedOut[ r.fromSymbol ];
+            disposition = CallDisposition::Unresolved;
+            continue;
         }
         // P2-D Rule 3 (import/include-based file narrow): when the name is ambiguous (K same-name defs) but the
         // caller's file #includes / imports EXACTLY ONE file that defines it, resolve to that file's def(s) and

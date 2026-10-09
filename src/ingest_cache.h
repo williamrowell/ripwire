@@ -302,7 +302,13 @@ constexpr std::uint32_t kCacheVersion = 28;           // 28: FE-A (test/falseedg
                                                       //    (Py `pkg.mod`, TS `./x`, Rust `crate::a::b`/`mod:x`) —
                                                       //    a target FORMAT change → old caches must be rejected.
                                                       // 4: Include gained a `bool isAngle` (quote/angle) field
-constexpr std::uint32_t kParserVer    = 150;          // bump on any grammar/.scm/extraction change
+constexpr std::uint32_t kParserVer    = 152;          // bump on any grammar/.scm/extraction change
+                                                      // 152 = 2026-10-09 (WDL, same lane as 150, PROVISIONAL): extraction kept changing under 150 — imports
+                                                      //   (Include + namespace Binding), then `call alias.task` captured with its receiver — so a cache a
+                                                      //   150 build wrote earlier answered a later 150 build with stale facts (a cached run lost
+                                                      //   `main.wdl`'s two qualified call edges; test/mcpclidiffcheck.sh caught it: CLI warm 35187 edges,
+                                                      //   cold and MCP 35189). Bumped rather than the cache cleared: the key is what must tell them apart.
+                                                      //   151 is skipped on purpose (150's rich file tag is kParserVer+1 = 151). kCacheVersion stays 28.
                                                       // 150 = 2026-10-08 (WDL, test/wdlcheck.sh): a new grammar (third_party/deps/wdl) and
                                                       //   queries/wdl/tags.scm, `.wdl` a kLangTable row, Lang::Wdl appended (24): a tree with
                                                       //   `.wdl` files yields new files, symbols and edges. PROVISIONAL — the maintainers assign
@@ -312,6 +318,8 @@ constexpr std::uint32_t kParserVer    = 150;          // bump on any grammar/.sc
                                                       //   cx/ccx (ingest_metrics.h), which changes cached per-def metrics — the branch is unreleased.
                                                       //   Also WDL `import "x.wdl" as a` is now an Include fact (ingest_relations.h wdlImportTarget),
                                                       //   so a tree with .wdl files yields new includes and --deps edges.
+                                                      //   And `call alias.task` is captured with the namespace as its receiver plus an Import
+                                                      //   Binding (captureWdlImportBind), so a tree with .wdl files yields new call edges.
                                                       // 148 = 2026-10-04 (train 26a: PR #373, Ruby method lookup, merged onto main's 143):
                                                       //   cache-key hygiene. The branch's Ruby extraction steps ran as 130–137,
                                                       //   142 and 145 (its notes below); main used 130–143 for other lanes, and

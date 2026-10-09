@@ -2181,8 +2181,35 @@ inline TSNode calleeAccessParent( TSNode nameNode ) noexcept
 // template arguments puts a template_method (and, behind `template`, a dependent_name) between the name and
 // its field_expression. Read through the raw parent, `other.f<T>()` classified None — a BARE call — and the
 // enclosing-class rule pinned it to the caller's own same-named method (test/cppqualcheck.sh §12 (d)).
+// WDL `call t.align`: @name is the task (the last of exactly two segments), the namespace an import binds is the
+// first. NamedVar with recvVar = the namespace — what graph.h's alias rule keys on. A one-segment target has no
+// qualified_identifier parent with two children, so an unqualified `call align` classifies as no receiver at all.
+inline RecvShape wdlCallReceiver( TSNode nameNode, std::string_view src )
+{
+    const TSNode q = ts_node_parent( nameNode );
+    if( ts_node_is_null( q ) || !kindIs( ts_node_type( q ), "qualified_identifier" ) || ts_node_named_child_count( q ) != 2 )
+    {
+        return {};
+    }
+    const TSNode first = ts_node_named_child( q, 0 );
+    if( ts_node_eq( first, nameNode ) || !kindIs( ts_node_type( first ), "identifier" ) )
+    {
+        return {};
+    }
+    const std::string_view ns = pattern::nodeText( first, src );
+    if( ns.empty() )
+    {
+        return {};
+    }
+    return { RecvKind::NamedVar, std::string( ns ), {} };
+}
+
 inline RecvShape receiverOf( TSNode nameNode, Lang lang, std::string_view src )
 {
+    if( lang == Lang::Wdl )
+    {
+        return wdlCallReceiver( nameNode, src );
+    }
     const TSNode parent = calleeAccessParent( nameNode );
     if( ts_node_is_null( parent ) )
     {

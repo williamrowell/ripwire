@@ -217,9 +217,10 @@ constexpr std::array<LangEntry, 54> kLangTable = {{
     // indexed: they are scene/resource/shader formats with their own grammars, and none is vendored here.
     { ".gd",   Lang::GDScript,   &tree_sitter_gdscript,   "gdscript"   },   // GDScript — class/func/var/const/enum/signal defs + calls
     // WDL (.wdl): Workflow Description Language. `task`, `workflow` and `struct` are the definitions; `call` is the
-    // edge. An import-qualified call (`call t.align`) names a task in ANOTHER document and has no call resolver yet, so
-    // queries/wdl/tags.scm captures only the unqualified spelling. Grammar blind spots: test/wdlcheck.sh.
-    { ".wdl",  Lang::Wdl,        &tree_sitter_wdl,        "wdl"        },   // WDL — task/workflow/struct defs + unqualified calls
+    // edge. An import-qualified call (`call t.align`) names a task in ANOTHER document: it carries the import's namespace
+    // as its receiver and graph.h binds it through that alias's one file, or leaves it unresolved. `import` itself is a
+    // --deps file edge (resolveWdlImport). Grammar blind spots: test/wdlcheck.sh.
+    { ".wdl",  Lang::Wdl,        &tree_sitter_wdl,        "wdl"        },   // WDL — task/workflow/struct defs + calls (qualified ones through the import alias)
     // Kotlin: `.kts` (Gradle script DSL) is deliberately NOT a row here yet — its trailing-lambda
     // density needs its own parse-quality probe before riding this grammar; `.kt` only for now.
     { ".kt",   Lang::Kotlin,     &tree_sitter_kotlin,     "kotlin"     },   // Kotlin — classes/objects/interfaces/functions + calls; JVM-bridged to Java (graph.h langCompatible)
