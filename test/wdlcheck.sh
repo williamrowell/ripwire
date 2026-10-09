@@ -100,4 +100,85 @@ assert 'tasks.wdl' not in rows and 'main.wdl' not in rows and 'decoy.wdl' not in
 print('  PASS the blind-spot fixture is DISCLOSED degraded (why=degraded-parse); clean files are not')
 PYSKIP
 
+# --- metrics: `if` / `scatter` / `&&` / `||` are counted ---
+# DIFFERENTIAL, not a pinned number: `branchy` carries 3 conditionals, a scatter, an `&&`, an `||` and a
+# ternary; `flat` carries none. WDL's `conditional`, `scatter`, `and_operator` and `or_operator` are
+# dedicated nodes (Python's `boolean_operator` precedent), so without the ingest_metrics.h arms they score
+# as ordinary nodes — only the ternary was counted — and the two workflows come out nearly equal.
+mkdir "$TMP/metrics"
+cat > "$TMP/metrics/m.wdl" <<'WDL'
+version 1.0
+
+task t {
+  command <<<
+    true
+  >>>
+}
+
+workflow flat {
+  input {
+    Boolean a
+    Boolean b
+  }
+  call t
+}
+
+workflow branchy {
+  input {
+    Boolean a
+    Boolean b
+    Array[Int] xs
+  }
+  if (a) {
+    call t as t1
+  }
+  if (a && b) {
+    call t as t2
+  }
+  if (a || b) {
+    call t as t3
+  }
+  scatter (x in xs) {
+    call t as t4
+  }
+  Int y = if a then 1 else 2
+}
+WDL
+"$BIN" "$TMP/metrics" --metrics --no-cache > "$TMP/metrics.xml"
+python3 - "$TMP/metrics.xml" <<'PYMET'
+import sys, xml.etree.ElementTree as ET
+syms = {s.get('n'): s for s in ET.parse(sys.argv[1]).iter('s')}
+flat, branchy = syms['flat'], syms['branchy']
+fcx, bcx = int(flat.get('cx', '0')), int(branchy.get('cx', '0'))
+fcc, bcc = int(flat.get('ccx', '0')), int(branchy.get('ccx', '0'))
+assert fcx >= 1, flat.attrib
+# 3 conditionals + 1 scatter + `&&` + `||` + 1 ternary = 7 decisions above `flat`'s baseline.
+assert bcx >= fcx + 7, (
+    'branchy cx=%d vs flat cx=%d — conditional / scatter / and_operator / or_operator are not '
+    'being counted for WDL' % (bcx, fcx))
+assert bcc > fcc, ('branchy ccx=%d is not above flat ccx=%d — conditional/scatter are not '
+                   'raising cognitive complexity' % (bcc, fcc))
+print('  PASS metrics: if / scatter / && / || raise cx and ccx')
+PYMET
+
+# --- langOfPath knows .wdl (lintrules.h kLintExtRows), not just the crawl table ---
+# REGRESSION ARM. The extension table is a fixed-size std::array: bumping its bound without adding the
+# row leaves the tail zero-filled to { "", Lang::Cpp } and compiles clean, so langOfPath("x.wdl") would
+# silently return Unknown while ingest_crawl.h still indexes the file. A rule row's applicable="0" beside
+# its own count>0 is the cheapest observable that contradicts it.
+mkdir "$TMP/lintwdl"
+printf 'version 1.0\n\ntask mixed_caseName {\n  command <<<\n    true\n  >>>\n}\n' > "$TMP/lintwdl/n.wdl"
+"$BIN" "$TMP/lintwdl" --lint --no-cache > "$TMP/lint.xml"
+python3 - "$TMP/lint.xml" <<'PYLINT'
+import sys, xml.etree.ElementTree as ET
+rules = {r.get('name'): r for r in ET.parse(sys.argv[1]).iter('rule')}
+fired = [n for n, r in rules.items() if n.startswith('naming-') and int(r.get('count', '0')) > 0]
+assert fired, ('no lint rule fired on the WDL fixture — the arm cannot reach a verdict', sorted(rules))
+for n in fired:
+    assert rules[n].get('applicable') != '0', (
+        'rule %s reports count=%s yet applicable="0" — langOfPath does not know .wdl is WDL '
+        '(lintrules.h extension row missing?)' % (n, rules[n].get('count')))
+print('  PASS langOfPath resolves .wdl (the lint catalog knows a WDL corpus)')
+PYLINT
+
 echo 'ALL PASS'

@@ -70,6 +70,12 @@ inline bool isDecisionType( const char* t, Lang lang ) noexcept
            // when_entry and the C-family case_statement are. The `match_statement` CONTAINER scores
            // flat +1 in cc_isNestingControl instead, so the two never double-count the same arm.
            || ( lang == Lang::GDScript && kindIs( t, "pattern_section" ) )
+           // WDL: `scatter` is the loop, and `&&`/`||` are DEDICATED nodes (and_operator / or_operator), so — as
+           // Python's boolean_operator above — they are decisions here, not through cc_isBooleanJoin. WDL's
+           // `if (c) { … }` is the node `conditional`, which the Ruby spelling further down already scores and
+           // nests under the same name (the ternary is the generic ternary_expression), so it is deliberately not
+           // repeated; test/wdlcheck.sh's metrics arm pins the sum.
+           || ( lang == Lang::Wdl && ( kindIs( t, "scatter" ) || kindIs( t, "and_operator" ) || kindIs( t, "or_operator" ) ) )
            // Ruby (tree-sitter-ruby node kinds): block `if`/`elsif`/`unless`/`while`/`until`/`for`, the
            // trailing modifier forms (`x if a`), each `when`/`in_clause` arm, `rescue`, and the `? :`
            // `conditional`. Ruby's `case`/`case_match` head is a nesting container (see cc_isNestingControl),
@@ -131,6 +137,9 @@ inline bool cc_isNestingControl( const char* t, Lang lang ) noexcept
            // GDScript: `match_statement` is the switch-equivalent CONTAINER (flat +1; the arms score
            // through isDecisionType's pattern_section) — mirrors switch_statement/when_expression.
            || ( lang == Lang::GDScript && kindIs( t, "match_statement" ) )
+           // WDL `scatter (x in xs) { … }` opens a nested body and scores like a loop. (`conditional` is the Ruby
+           // spelling below; and_operator / or_operator score flat in isDecisionType and open no body.)
+           || ( lang == Lang::Wdl && kindIs( t, "scatter" ) )
            // Ruby (tree-sitter-ruby): the block control forms each open a nested body, so they raise nesting
            // AND score. `case`/`case_match` is the switch-equivalent container (flat +1, arms score via
            // isDecisionType — mirrors switch_statement). The trailing MODIFIER forms (`x if a`) have no nested
