@@ -55,9 +55,9 @@ DEPS="$( cat "$TMP/deps" )"
 LANGS="$( printf '%s' "$DEPS" | grep -oE 'dep_langs="[^"]*"' | head -1 )"
 
 # ── (A) the published set, exactly ────────────────────────────────────────────────────────────────────
-EXPECT='dep_langs="cpp,py,ts,go,rs,swift,objc,js,sh,java,rb,cs,c,php,lua,ex,kt"'
+EXPECT='dep_langs="cpp,py,ts,go,rs,swift,objc,js,sh,java,rb,cs,c,php,lua,ex,kt,wdl"'
 [ "$LANGS" = "$EXPECT" ] \
-    && ok "(A) <health dep_langs=> is exactly the 17-language capable set, in Lang-enum order" \
+    && ok "(A) <health dep_langs=> is exactly the 18-language capable set, in Lang-enum order" \
     || no "(A) dep_langs= drifted: got [$LANGS] want [$EXPECT]"
 
 # ── (B) MUTATION CONTROL for (A) — the exclusions are real ────────────────────────────────────────────

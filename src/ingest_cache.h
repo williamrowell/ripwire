@@ -310,6 +310,8 @@ constexpr std::uint32_t kParserVer    = 150;          // bump on any grammar/.sc
                                                       //   so a build at 149 would read 148's rich tag as its own plain one. kCacheVersion stays 28.
                                                       //   Same lane, same number: WDL's `scatter`, `and_operator` and `or_operator` now score in
                                                       //   cx/ccx (ingest_metrics.h), which changes cached per-def metrics — the branch is unreleased.
+                                                      //   Also WDL `import "x.wdl" as a` is now an Include fact (ingest_relations.h wdlImportTarget),
+                                                      //   so a tree with .wdl files yields new includes and --deps edges.
                                                       // 148 = 2026-10-04 (train 26a: PR #373, Ruby method lookup, merged onto main's 143):
                                                       //   cache-key hygiene. The branch's Ruby extraction steps ran as 130–137,
                                                       //   142 and 145 (its notes below); main used 130–143 for other lanes, and

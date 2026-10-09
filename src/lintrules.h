@@ -262,10 +262,10 @@ inline bool dependencyCapable( Lang lang ) noexcept
         case Lang::Java: case Lang::CSharp: case Lang::Php:
         case Lang::Bash: case Lang::Ruby: case Lang::Lua: case Lang::Elixir:
         case Lang::Kotlin:
+        case Lang::Wdl:
             return true;
         case Lang::Dart:   // no import capture yet — see the DART paragraph above
         case Lang::GDScript:   // no preload/load capture yet — the same paragraph
-        case Lang::Wdl:        // `import "x.wdl" as a` is not captured and no WDL resolver exists — the same paragraph
         case Lang::Json: case Lang::Toml: case Lang::Yaml: case Lang::Markdown: case Lang::Unknown:
             return false;
     }

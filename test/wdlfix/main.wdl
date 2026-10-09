@@ -1,6 +1,9 @@
 version 1.0
 
 import "tasks.wdl" as t
+import "sub/util.wdl" as u
+import "https://example.org/remote.wdl" as remote
+import "nowhere/tasks.wdl" as ghost
 
 task local_helper {
   input {

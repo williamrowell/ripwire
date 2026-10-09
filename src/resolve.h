@@ -172,7 +172,7 @@ inline std::string lexicalNormalize( std::string_view path )
 // The import dialect a file's imports resolve in, keyed off its extension. C-family covers the quote
 // `#include`; Other (Swift/Java/C#/PHP/Markdown/…) never precise-resolves (deferred / no path in import).
 // Bash/Ruby/Lua/Elixir joined at kParserVer 81 — see their Step-As below.
-enum class IncludeLang : std::uint8_t { CFamily, Python, Ts, Rust, Go, Bash, Ruby, Lua, Elixir, Other };
+enum class IncludeLang : std::uint8_t { CFamily, Python, Ts, Rust, Go, Bash, Ruby, Lua, Elixir, Wdl, Other };
 
 // extension → dialect, a declarative constexpr table (NOT a scattered if-chain). Extension includes the
 // leading dot; the classifier lowercases nothing (source extensions are lowercase by convention here).
@@ -211,6 +211,7 @@ inline IncludeLang includeLangOf( std::string_view path ) noexcept
         { ".rb",  IncludeLang::Ruby },    { ".rake", IncludeLang::Ruby },  { ".jbuilder", IncludeLang::Ruby },
         { ".lua", IncludeLang::Lua },
         { ".ex",  IncludeLang::Elixir },  { ".exs", IncludeLang::Elixir },
+        { ".wdl", IncludeLang::Wdl },
         // B6.2: `.cs` has NO entry here — it falls through to IncludeLang::Other below, DEFERRED like
         // Java (also absent) and Swift/Go-single-root: a C# namespace does not map 1:1 onto a file (one
         // namespace spans many files, one file can hold several namespaces), so there is no sound
@@ -1350,6 +1351,26 @@ inline std::uint32_t resolveBashSource( std::string_view includerPath, std::stri
     return p.result();
 }
 
+// ── WDL Step-A — SOUND. `import "tasks.wdl" as t` names a FILE by a path relative to the IMPORTING document
+// (the spec's relative-URI rule), so there is no search path and no name→path convention to evaluate: one
+// probe, `includerDir / specifier` with `..` and `.` folded, and the answer is the indexed file at exactly
+// that path or nothing. A URL (`https://…`, `file://…`) and an absolute path are outside the crawl by
+// construction and floor; so does a specifier that names nothing in the tree. A floor is still a visible
+// `<inc t="…"/>` row in `--deps`. There is NO basename or stem fallback (`nowhere/tasks.wdl` must not land on
+// `tasks.wdl`): the probe is the whole rule, and unique-or-degrade holds trivially because a path names one file.
+inline std::uint32_t resolveWdlImport( std::string_view includerPath, std::string_view target,
+                                       const HashMap<std::string, std::uint32_t>& fileIndex,
+                                       const WsIncludeCtx* ws = nullptr, std::uint32_t includerFileId = kNoFile )
+{
+    if( target.empty() || target.front() == '/' || target.find( "://" ) != std::string_view::npos )
+    {
+        return kNoFile;
+    }
+    UniqueProbe p;
+    p.consider( joinNormalizeLookup( includerDir( includerPath ), target, fileIndex, ws, includerFileId ) );
+    return p.result();
+}
+
 // ── Lua Step-A — SOUND. `require "a.b"` → package.path's dotted convention: dots become directory
 // separators and the module is either `a/b.lua` or the package form `a/b/init.lua`. Probed relative to
 // the requiring file AND against a small fixed list of source roots — "" (the crawl root), `src/` and
@@ -2174,6 +2195,7 @@ inline std::uint32_t resolvePreciseInclude( std::string_view includerPath, std::
         case IncludeLang::Ruby:   return resolveRubyRequire( includerPath, target, fileIndex, ws, includerFileId );
         case IncludeLang::Lua:    return resolveLuaRequire(  includerPath, target, fileIndex, ws, includerFileId );
         case IncludeLang::Elixir: return resolveElixirModule( target, moduleIndex );
+        case IncludeLang::Wdl:    return resolveWdlImport(  includerPath, target, fileIndex, ws, includerFileId );
         case IncludeLang::Other:  return kNoFile;        // Swift (no path in import) → deferred
     }
     return kNoFile;

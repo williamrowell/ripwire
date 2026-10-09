@@ -1265,6 +1265,26 @@ inline std::string firstStringArgText( TSNode args, std::string_view src )
     return stringLiteralText( ts_node_named_child( args, 0 ), src );
 }
 
+// WDL `import "tasks.wdl" as t` — an `import` node whose `uri:` is a `simple_string`. The specifier is the string's
+// single `content` child, so a literal with an escape sequence in it (`"a\"b.wdl"`) reads as nothing rather than
+// as a fragment, exactly as stringLiteralText refuses an interpolated Lua string. The namespace after `as` is a
+// BINDING, not a dependency, and is read by nothing here.
+inline std::string wdlImportTarget( TSNode n, std::string_view src )
+{
+    const TSNode str = firstChildOfType( n, "simple_string" );
+    if( ts_node_is_null( str ) )
+    {
+        return {};
+    }
+    const TSNode parts = firstChildOfType( str, "string_parts" );
+    if( ts_node_is_null( parts ) || ts_node_named_child_count( parts ) != 1 )
+    {
+        return {};   // an empty string, or one with an escape sequence between its fragments
+    }
+    const TSNode only = ts_node_named_child( parts, 0 );
+    return kindIs( ts_node_type( only ), "content" ) ? std::string( nodeTextOf( only, src ) ) : std::string{};
+}
+
 // Lua `require "a.b"` / `require("a.b")` — a `function_call` whose `name:` is the bare identifier
 // `require`. The dotted specifier is package.path's convention, resolved in resolve.h::resolveLuaRequire
 // (`a.b` → `a/b.lua`). `name:` must be an `identifier`, never a `dot_index_expression`: `pkg.require("x")`
@@ -1915,6 +1935,10 @@ inline constexpr std::array<std::string_view, 17> kBashImportContainers = {
     "list", "pipeline", "negated_command", "redirected_statement", "command_substitution"
 };
 
+// WDL. `import "x.wdl" as a` is a direct child of the `document_body` node, which is the only container: the walk
+// starts at the root's children (`version`, `document_body`) and a `task`/`workflow`/`struct` holds no import.
+inline constexpr std::array<std::string_view, 1> kWdlImportContainers = { "document_body" };
+
 // LUA. `local m = require "x"` is `variable_declaration -> assignment_statement -> expression_list ->
 // function_call`, so all three intermediates are load-bearing; `function_declaration`/`block` reach a
 // body; `table_constructor`/`field` reach `M.dep = require "x"` inside a returned table, which is how a
@@ -2050,7 +2074,7 @@ inline constexpr std::array<std::string_view, 34> kJsImportContainers = {
 // language has is DATA, and a language absent from the table simply has none.
 struct LangImportContainers { Lang lang; std::span<const std::string_view> nodes; };
 
-inline constexpr std::array<LangImportContainers, 9> kImportContainersByLang = { {
+inline constexpr std::array<LangImportContainers, 10> kImportContainersByLang = { {
     { Lang::Python,     kPythonImportContainers },
     { Lang::Rust,       kRustImportContainers   },
     { Lang::CSharp,     kCsharpImportContainers },
@@ -2059,7 +2083,8 @@ inline constexpr std::array<LangImportContainers, 9> kImportContainersByLang = {
     { Lang::Bash,       kBashImportContainers   },
     { Lang::Lua,        kLuaImportContainers    },
     { Lang::Elixir,     kElixirImportContainers },
-    { Lang::Kotlin,     kKotlinImportContainers }
+    { Lang::Kotlin,     kKotlinImportContainers },
+    { Lang::Wdl,        kWdlImportContainers    }
 } };
 
 inline bool isImportContainer( Lang lang, const char* type ) noexcept
@@ -2179,6 +2204,10 @@ DirectiveTarget directiveTargetOf( TSNode n, const char* t, std::string_view src
     else if( kindIs( t, "command" ) && lang == Lang::Bash )              // Bash `source x.sh` / `. x.sh`
     {
         target = bashSourceTarget( n, src );
+    }
+    else if( kindIs( t, "import" ) && lang == Lang::Wdl )                // WDL `import "tasks.wdl" as t`
+    {
+        target = wdlImportTarget( n, src );
     }
     else if( kindIs( t, "function_call" ) && lang == Lang::Lua )         // Lua `require "a.b"`
     {

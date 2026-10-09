@@ -31,7 +31,8 @@
     . (identifier) @name .)) @reference.call
 
 ; NOT captured, on purpose: `call t.align` — an import-qualified call. `t` is an alias bound by
-; `import "tasks.wdl" as t`, so the target lives in another document and no WDL import resolver exists
+; `import "tasks.wdl" as t`, so the target lives in another document and no WDL CALL resolver exists
 ; yet. Laddering the bare `align` over the corpus would mint edges that are not real (the PR #81 decision;
-; test/wdlfix/decoy.wdl defines a second `align` to prove it). It is simply not an edge. `import` itself is
-; not captured either: a `@reference.import` here needs the resolver that would consume it.
+; test/wdlfix/decoy.wdl defines a second `align` to prove it). It is simply not an edge. `import` is not
+; captured HERE either: a WDL import is an Include fact read in C++ (ingest_relations.h wdlImportTarget, resolved
+; by resolve.h resolveWdlImport) — a file-to-file `--deps` edge — not a @reference.import tag.

@@ -181,4 +181,41 @@ for n in fired:
 print('  PASS langOfPath resolves .wdl (the lint catalog knows a WDL corpus)')
 PYLINT
 
+# --- imports: `import "x.wdl" as a` is a physical file-to-file dependency (--deps) ---
+# Fixture (the resolve.h::resolveWdlImport contract, one line each):
+#   main.wdl      import "tasks.wdl" as t                       -> tasks.wdl            plain sibling
+#   main.wdl      import "sub/util.wdl" as u                    -> sub/util.wdl         relative subdirectory
+#   sub/util.wdl  import "../tasks.wdl"                         -> tasks.wdl            `..` against the IMPORTER's directory
+#   main.wdl      import "https://example.org/remote.wdl" ...   -> no edge               remote: outside the crawl
+#   main.wdl      import "nowhere/tasks.wdl" as ghost           -> no edge               names nothing, but its BASENAME is
+#                                                                                        tasks.wdl — must not be basename-matched
+"$BIN" "$TMP/fix" --deps --no-cache > "$TMP/deps.xml"
+DEPS="$( cat "$TMP/deps.xml" )"
+for t in 'tasks.wdl' 'sub/util.wdl' 'https://example.org/remote.wdl' 'nowhere/tasks.wdl' '../tasks.wdl'; do
+    printf '%s' "$DEPS" | grep -qF "<inc t=\"$t\"/>" \
+        && echo "  PASS capture: <inc t=\"$t\"/> (the string, without quotes)" \
+        || { echo "  FAIL capture: no <inc t=\"$t\"/> row"; exit 1; }
+done
+printf '%s' "$DEPS" | grep -q '<f p="main.wdl" includes="4"' \
+    || { echo "  FAIL capture: main.wdl should carry exactly 4 import directives: $( printf '%s' "$DEPS" | grep -oE '<f p="main.wdl"[^>]*>' )"; exit 1; }
+echo '  PASS capture: main.wdl carries exactly 4 import directives'
+# tasks.wdl is imported by main.wdl AND by sub/util.wdl (via `..`); sub/util.wdl once.
+printf '%s' "$DEPS" | grep -q '<f p="tasks.wdl" afferent="2"/>' \
+    || { echo "  FAIL resolve: tasks.wdl afferent != 2: $( printf '%s' "$DEPS" | grep -oE '<f p="tasks.wdl"[^>]*>' )"; exit 1; }
+printf '%s' "$DEPS" | grep -q '<f p="sub/util.wdl" afferent="1"/>' \
+    || { echo "  FAIL resolve: sub/util.wdl afferent != 1"; exit 1; }
+echo '  PASS resolve: tasks.wdl afferent=2 (sibling + `..` from a subdirectory), sub/util.wdl afferent=1'
+# mutation controls: a remote URL and a missing path are DISCLOSED rows with no edge; decoy.wdl is never
+# the target of anything (no basename or stem fallback); blindspots.wdl imports nothing.
+if printf '%s' "$DEPS" | grep -qE '<f p="(decoy|blindspots)\.wdl" afferent='; then
+    echo '  FAIL mutation control: decoy.wdl / blindspots.wdl gained an importer'; exit 1
+fi
+echo '  PASS mutation control: no file gained an edge from the remote URL or the missing nowhere/tasks.wdl'
+# capability: .wdl files are in the dependency denominator and the dialect is disclosed
+printf '%s' "$DEPS" | grep -qE 'dep_langs="[^"]*,wdl[,"]' \
+    || { echo "  FAIL capability: dep_langs= does not name wdl: $( printf '%s' "$DEPS" | grep -oE 'dep_langs=\"[^\"]*\"' )"; exit 1; }
+printf '%s' "$DEPS" | grep -qE '<health files="([0-9]+)" dep_files="\1"' \
+    || { echo "  FAIL capability: dep_files != files: $( printf '%s' "$DEPS" | grep -oE '<health [^/]*/>' )"; exit 1; }
+echo '  PASS capability: wdl is in dep_langs= and every .wdl file is dependency-capable'
+
 echo 'ALL PASS'

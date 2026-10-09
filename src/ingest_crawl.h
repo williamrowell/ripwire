@@ -217,7 +217,7 @@ constexpr std::array<LangEntry, 54> kLangTable = {{
     // indexed: they are scene/resource/shader formats with their own grammars, and none is vendored here.
     { ".gd",   Lang::GDScript,   &tree_sitter_gdscript,   "gdscript"   },   // GDScript — class/func/var/const/enum/signal defs + calls
     // WDL (.wdl): Workflow Description Language. `task`, `workflow` and `struct` are the definitions; `call` is the
-    // edge. An import-qualified call (`call t.align`) names a task in ANOTHER document and has no resolver yet, so
+    // edge. An import-qualified call (`call t.align`) names a task in ANOTHER document and has no call resolver yet, so
     // queries/wdl/tags.scm captures only the unqualified spelling. Grammar blind spots: test/wdlcheck.sh.
     { ".wdl",  Lang::Wdl,        &tree_sitter_wdl,        "wdl"        },   // WDL — task/workflow/struct defs + unqualified calls
     // Kotlin: `.kts` (Gradle script DSL) is deliberately NOT a row here yet — its trailing-lambda
